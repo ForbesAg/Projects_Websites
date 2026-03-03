@@ -34,6 +34,11 @@ export default function ReportsPage() {
   const [activeReport, setActiveReport] = useState("Sales Summary");
   const [dateRange, setDateRange] = useState("This Month");
 
+  const exportToPDF = () => {
+    // Open print dialog for PDF export
+    window.print();
+  };
+
   const totalSales = sales.reduce((sum, s) => sum + s.totalAmount, 0);
   const totalTransactions = sales.length;
   const avgSaleValue = totalSales / totalTransactions;
@@ -75,7 +80,10 @@ export default function ReportsPage() {
                 <option>Last 3 Months</option>
                 <option>This Year</option>
               </select>
-              <button className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
+              <button 
+                onClick={exportToPDF}
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+              >
                 <Download size={14} />
                 Export PDF
               </button>

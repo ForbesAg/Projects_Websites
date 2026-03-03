@@ -42,7 +42,32 @@ body {
 
 /* Print styles */
 @media print {
+  body {
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .no-print {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+  /* Ensure charts and tables print properly */
+  .recharts-responsive-container {
+    min-height: 200px;
+  }
+  table {
+    font-size: 10px;
+  }
+  /* Avoid page breaks in the middle of tables */
+  table, tr, td, th {
+    page-break-inside: avoid;
   }
 }

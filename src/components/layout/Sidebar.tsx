@@ -30,7 +30,7 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings, roles: ["Admin"] },
 ];
 
-export function Sidebar() {
+export function Sidebar({ className = "" }: { className?: string }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -49,7 +49,7 @@ export function Sidebar() {
     : "?";
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 flex flex-col z-40" style={{ backgroundColor: "#1a3a5c" }}>
+    <aside className={`fixed left-0 top-0 h-full w-64 flex flex-col z-40 ${className}`} style={{ backgroundColor: "#1a3a5c" }}>
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
         <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#0ea5e9" }}>

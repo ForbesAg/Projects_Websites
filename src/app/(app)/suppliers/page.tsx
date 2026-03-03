@@ -21,6 +21,12 @@ export default function SuppliersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [showPOModal, setShowPOModal] = useState(false);
+  const [newPO, setNewPO] = useState({
+    supplierId: "",
+    items: "",
+    notes: ""
+  });
 
   const filteredSuppliers = suppliers.filter(
     (s) =>
@@ -34,6 +40,8 @@ export default function SuppliersPage() {
       p.supplierName.toLowerCase().includes(search.toLowerCase()) ||
       p.id.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPayable = suppliers.reduce((sum, s) => sum + s.balance, 0);
 
   const openAdd = () => {
     setEditSupplier({ id: "", name: "", phone: "", email: "", kraPin: "", address: "", balance: 0 });
@@ -56,7 +64,15 @@ export default function SuppliersPage() {
     setEditSupplier(null);
   };
 
-  const totalPayable = suppliers.reduce((sum, s) => sum + s.balance, 0);
+  const createPurchaseOrder = () => {
+    if (!newPO.supplierId || !newPO.items) {
+      alert("Please select a supplier and add items");
+      return;
+    }
+    alert(`Purchase Order created! (Demo only - data not persisted)`);
+    setShowPOModal(false);
+    setNewPO({ supplierId: "", items: "", notes: "" });
+  };
 
   return (
     <div>
@@ -192,6 +208,7 @@ export default function SuppliersPage() {
                     />
                   </div>
                   <button
+                    onClick={() => setShowPOModal(true)}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
                     style={{ backgroundColor: "#1a3a5c" }}
                   >
@@ -288,6 +305,72 @@ export default function SuppliersPage() {
               >
                 <Save size={14} />
                 Save Supplier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Purchase Order Modal */}
+      {showPOModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => {
+          if (e.target === e.currentTarget) setShowPOModal(false);
+        }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold text-slate-800">Create Purchase Order</h3>
+              <button onClick={() => setShowPOModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Supplier *</label>
+                <select
+                  value={newPO.supplierId}
+                  onChange={(e) => setNewPO({ ...newPO, supplierId: e.target.value })}
+                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value="">Select a supplier...</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Items *</label>
+                <textarea
+                  value={newPO.items}
+                  onChange={(e) => setNewPO({ ...newPO, items: e.target.value })}
+                  placeholder="Enter items (one per line: Product name, quantity, unit price)..."
+                  rows={4}
+                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Notes</label>
+                <textarea
+                  value={newPO.notes}
+                  onChange={(e) => setNewPO({ ...newPO, notes: e.target.value })}
+                  placeholder="Additional notes..."
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 p-6 border-t border-slate-100">
+              <button
+                onClick={() => setShowPOModal(false)}
+                className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createPurchaseOrder}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ backgroundColor: "#1a3a5c" }}
+              >
+                <FileText size={14} />
+                Create Order
               </button>
             </div>
           </div>

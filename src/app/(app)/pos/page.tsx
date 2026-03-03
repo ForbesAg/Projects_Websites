@@ -8,7 +8,7 @@ import type { Product, SaleItem } from "@/lib/types";
 import {
   Search, Plus, Minus, Trash2, ShoppingCart, CreditCard,
   Smartphone, Banknote, Printer, X, CheckCircle, Barcode,
-  Tag, ChevronDown
+  Tag, ChevronDown, Menu, Settings
 } from "lucide-react";
 
 const categories = ["All", "Flour & Grains", "Cooking Oils", "Sugar & Sweeteners", "Dairy", "Bakery", "Medicines", "Building Materials", "Hardware", "Beverages", "Detergents"];
@@ -22,6 +22,9 @@ export default function POSPage() {
   const [customerName, setCustomerName] = useState("");
   const [showReceipt, setShowReceipt] = useState(false);
   const [completedSale, setCompletedSale] = useState<{ id: string; total: number; method: string } | null>(null);
+  const [showCart, setShowCart] = useState(true);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
   const [cashReceived, setCashReceived] = useState("");
 
   const filteredProducts = allProducts.filter((p) => {
@@ -93,6 +96,20 @@ export default function POSPage() {
     setCompletedSale(null);
   };
 
+  const addCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      // In a real app, this would be saved to the database
+      alert(`Category "${newCategory}" will be added! (Demo only - data not persisted)`);
+      setNewCategory("");
+      setShowCategoryModal(false);
+    }
+  };
+
+  const printReceipt = () => {
+    // Open print dialog
+    window.print();
+  };
+
   return (
     <div>
       <TopBar title="Point of Sale" subtitle="Fast checkout processing" />
@@ -101,7 +118,7 @@ export default function POSPage() {
         {/* Products Panel */}
         <div className="flex-1 flex flex-col overflow-hidden p-4">
           {/* Search & Filter */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-2 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
@@ -116,10 +133,17 @@ export default function POSPage() {
               <Barcode size={16} />
               Scan
             </button>
+            <button 
+              onClick={() => setShowCart(!showCart)}
+              className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50"
+            >
+              <ShoppingCart size={16} />
+              <span className="badge bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{cartItems.length}</span>
+            </button>
           </div>
 
           {/* Category Filter */}
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1 items-center">
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -134,6 +158,13 @@ export default function POSPage() {
                 {cat}
               </button>
             ))}
+            <button
+              onClick={() => setShowCategoryModal(true)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 flex items-center gap-1"
+            >
+              <Plus size={12} />
+              Add Category
+            </button>
           </div>
 
           {/* Products Grid */}
@@ -178,7 +209,14 @@ export default function POSPage() {
         </div>
 
         {/* Cart Panel */}
-        <div className="w-80 xl:w-96 bg-white border-l border-slate-200 flex flex-col">
+        <div className={`${showCart ? 'block' : 'hidden'} lg:block w-full sm:w-80 md:w-80 lg:w-80 xl:w-96 bg-white border-l border-slate-200 flex flex-col fixed lg:relative right-0 top-0 h-full lg:h-auto z-40 lg:z-auto`}>
+          {/* Mobile Cart Header with Close */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-slate-100">
+            <h3 className="font-semibold text-slate-800">Current Sale</h3>
+            <button onClick={() => setShowCart(false)} className="p-1 hover:bg-slate-100 rounded">
+              <X size={20} />
+            </button>
+          </div>
           {/* Cart Header */}
           <div className="p-4 border-b border-slate-100">
             <div className="flex items-center justify-between mb-3">
@@ -336,8 +374,10 @@ export default function POSPage() {
 
       {/* Receipt Modal */}
       {showReceipt && completedSale && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => {
+          if (e.target === e.currentTarget) setShowReceipt(false);
+        }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <div className="p-6 text-center border-b border-slate-100">
               <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <CheckCircle size={28} className="text-emerald-600" />
@@ -388,7 +428,10 @@ export default function POSPage() {
               </div>
 
               <div className="flex gap-3">
-                <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+                <button 
+                  onClick={printReceipt}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50"
+                >
                   <Printer size={15} />
                   Print
                 </button>
@@ -400,6 +443,56 @@ export default function POSPage() {
                   New Sale
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Category Management Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={(e) => {
+          if (e.target === e.currentTarget) setShowCategoryModal(false);
+        }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold text-slate-800">Manage Categories/Departments</h3>
+              <button onClick={() => setShowCategoryModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Add New Category</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="Enter category name..."
+                    className="flex-1 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+                  />
+                  <button
+                    onClick={addCategory}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-2">Existing Categories</label>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {categories.filter(c => c !== 'All').map((cat) => (
+                    <div key={cat} className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-lg">
+                      <span className="text-sm text-slate-700">{cat}</span>
+                      <button className="text-slate-400 hover:text-red-500">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">Note: Categories need to be saved to the database for persistence.</p>
             </div>
           </div>
         </div>
