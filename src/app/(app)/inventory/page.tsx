@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import type { Product } from "@/lib/types";
 import {
   Search, Plus, Edit2, Trash2, AlertTriangle, Package,
-  Download, Upload, X, Save, ChevronUp, ChevronDown, RefreshCw
+  Download, Upload, X, Save, ChevronUp, ChevronDown, RefreshCw, LayoutGrid, List
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -39,6 +39,7 @@ export default function InventoryPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   const canEdit = user?.role === "Admin" || user?.role === "Manager";
 
@@ -223,6 +224,23 @@ export default function InventoryPage() {
               </select>
             </div>
             <div className="flex gap-2">
+              {/* View Toggle */}
+              <div className="flex border border-slate-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`p-2 ${viewMode === "list" ? "bg-sky-500 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                  title="List View"
+                >
+                  <List size={16} />
+                </button>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-2 ${viewMode === "grid" ? "bg-sky-500 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+                  title="Grid View"
+                >
+                  <LayoutGrid size={16} />
+                </button>
+              </div>
               <button
                 onClick={fetchProducts}
                 className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
@@ -247,10 +265,47 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {/* Products Table */}
+        {/* Products View - List or Grid */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
           {loading ? (
             <div className="text-center py-12 text-slate-400">Loading products...</div>
+          ) : viewMode === "grid" ? (
+            /* Grid View */
+            <div className="p-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {filtered.map((product) => {
+                  const status = getStockStatus(product);
+                  return (
+                    <div
+                      key={product.id}
+                      className="border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => openEdit(product)}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                          <Package size={20} className="text-slate-400" />
+                        </div>
+                        <Badge variant={status.variant}>{status.label}</Badge>
+                      </div>
+                      <h4 className="font-medium text-slate-800 text-sm truncate">{product.name}</h4>
+                      <p className="text-xs text-slate-400 mb-2">{product.sku}</p>
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <p className="text-xs text-slate-500">Selling</p>
+                          <p className="text-sm font-bold text-slate-800">KES {product.sellingPrice}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500">Stock</p>
+                          <p className={`text-sm font-bold ${product.quantity === 0 ? "text-red-600" : product.quantity <= product.reorderLevel ? "text-amber-600" : "text-slate-800"}`}>
+                            {product.quantity}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
             <>
               <div className="overflow-x-auto">

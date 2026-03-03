@@ -15,6 +15,7 @@ import {
 
 const reportTypes = [
   "Sales Summary",
+  "Customer Sales",
   "Inventory Status",
   "Branch Performance",
   "Payment Analysis",
@@ -33,16 +34,41 @@ const slowMovingProducts = products
 export default function ReportsPage() {
   const [activeReport, setActiveReport] = useState("Sales Summary");
   const [dateRange, setDateRange] = useState("This Month");
+  
+  // Filter states
+  const [filterItem, setFilterItem] = useState("All");
+  const [filterCategory, setFilterCategory] = useState("All");
+  const [filterCustomer, setFilterCustomer] = useState("All");
+  const [filterBranch, setFilterBranch] = useState("All");
+
+  // Get unique values for filters
+  const categories = ["All", ...Array.from(new Set(products.map((p) => p.category)))];
+  const customers = ["All", ...Array.from(new Set(sales.map((s) => s.customer || "Walk-in Customer")))];
+  const items = ["All", ...products.map((p) => p.name)];
+  const branches = ["All", "Main Branch", "Westlands", "Mombasa"];
+
+  // Filter sales based on selections
+  const filteredSales = sales.filter((s) => {
+    const matchCustomer = filterCustomer === "All" || s.customer === filterCustomer;
+    const matchItem = filterItem === "All" || s.items.some((item) => item.productName === filterItem);
+    return matchCustomer && matchItem;
+  });
+
+  // Filter products based on category
+  const filteredProducts = products.filter((p) => {
+    return filterCategory === "All" || p.category === filterCategory;
+  });
 
   const exportToPDF = () => {
     // Open print dialog for PDF export
     window.print();
   };
 
-  const totalSales = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-  const totalTransactions = sales.length;
-  const avgSaleValue = totalSales / totalTransactions;
-  const totalVat = sales.reduce((sum, s) => sum + s.vatAmount, 0);
+  // Use filtered sales for calculations
+  const totalSales = filteredSales.reduce((sum, s) => sum + s.totalAmount, 0);
+  const totalTransactions = filteredSales.length;
+  const avgSaleValue = totalTransactions > 0 ? totalSales / totalTransactions : 0;
+  const totalVat = filteredSales.reduce((sum, s) => sum + s.vatAmount, 0);
 
   return (
     <div>
@@ -69,6 +95,39 @@ export default function ReportsPage() {
               ))}
             </div>
             <div className="flex gap-2">
+              {/* Filter by Customer */}
+              <select
+                value={filterCustomer}
+                onChange={(e) => setFilterCustomer(e.target.value)}
+                className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                <option value="All">All Customers</option>
+                {customers.filter(c => c !== "All").map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {/* Filter by Category/Department */}
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>
+                ))}
+              </select>
+              {/* Filter by Item */}
+              <select
+                value={filterItem}
+                onChange={(e) => setFilterItem(e.target.value)}
+                className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                <option value="All">All Items</option>
+                {items.filter(i => i !== "All").map((i) => (
+                  <option key={i} value={i}>{i}</option>
+                ))}
+              </select>
+              {/* Date Range */}
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
@@ -198,6 +257,99 @@ export default function ReportsPage() {
                         <td className="px-4 py-3">
                           <Badge variant="success">{sale.paymentStatus}</Badge>
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Customer Sales Report */}
+        {activeReport === "Customer Sales" && (
+          <div className="space-y-5">
+            {/* Customer Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { label: "Total Customers", value: customers.length - 1 },
+                { label: "Total Sales", value: `KES ${totalSales.toLocaleString()}` },
+                { label: "Transactions", value: totalTransactions },
+                { label: "Avg per Customer", value: `KES ${(totalSales / Math.max(customers.length - 1, 1)).toFixed(0)}` },
+              ].map((kpi) => (
+                <div key={kpi.label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+                  <p className="text-xs text-slate-500 font-medium">{kpi.label}</p>
+                  <p className="text-xl font-bold text-slate-800 mt-1">{kpi.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Customer Sales Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-semibold text-slate-800">Sales by Customer</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Customer</th>
+                      <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Sales Count</th>
+                      <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Total Spent</th>
+                      <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Avg Transaction</th>
+                      <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Last Purchase</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {customers.filter(c => c !== "All").map((customer) => {
+                      const customerSales = sales.filter(s => s.customer === customer);
+                      const totalSpent = customerSales.reduce((sum, s) => sum + s.totalAmount, 0);
+                      return (
+                        <tr key={customer} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-slate-800">{customer}</p>
+                              <p className="text-xs text-slate-400">{customerSales.length} transactions</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{customerSales.length}</td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800 text-right">KES {totalSpent.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-slate-600 text-right">KES {(totalSpent / Math.max(customerSales.length, 1)).toFixed(0)}</td>
+                          <td className="px-4 py-3 text-sm text-slate-500">
+                            {customerSales.length > 0 ? new Date(customerSales[0].date).toLocaleDateString("en-KE") : "N/A"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Recent Customer Transactions */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-semibold text-slate-800">Recent Transactions by Customer</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Receipt No</th>
+                      <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Customer</th>
+                      <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Items</th>
+                      <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Total</th>
+                      <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filteredSales.slice(0, 10).map((sale) => (
+                      <tr key={sale.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-sm font-mono text-slate-600">{sale.id}</td>
+                        <td className="px-4 py-3 text-sm text-slate-800">{sale.customer || "Walk-in Customer"}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{sale.items.length} items</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-slate-800 text-right">KES {sale.totalAmount.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500">{new Date(sale.date).toLocaleDateString("en-KE")}</td>
                       </tr>
                     ))}
                   </tbody>

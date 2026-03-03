@@ -110,6 +110,68 @@ export default function POSPage() {
     window.print();
   };
 
+  // Barcode Scanner Function
+  const handleBarcodeScan = async () => {
+    // Check if BarcodeDetector API is available (Chrome/Edge)
+    if ("BarcodeDetector" in window) {
+      try {
+        // @ts-ignore - BarcodeDetector is not in TypeScript types yet
+        const barcodeDetector = new window.BarcodeDetector({
+          formats: ["ean_13", "ean_8", "code_128", "code_39", "qr_code", "upc_a", "upc_e"]
+        });
+        
+        // Request camera access
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: "environment" } 
+        });
+        
+        // Create video element for scanning
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.setAttribute("playsinline", "true");
+        video.play();
+        
+        // Create a scanning indicator
+        const scanningMsg = alert("Point camera at barcode. Press OK when done, or wait 10 seconds.");
+        
+        // Try to detect barcode for 10 seconds
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Scan timeout")), 10000)
+        );
+        
+        const detectPromise = (async () => {
+          while (true) {
+            try {
+              const barcodes = await barcodeDetector.detect(video);
+              if (barcodes.length > 0) {
+                const barcode = barcodes[0].rawValue;
+                stream.getTracks().forEach(track => track.stop());
+                // Search for product with this barcode
+                setSearch(barcode);
+                return;
+              }
+            } catch {
+              // Continue scanning
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        })();
+        
+        await Promise.race([detectPromise, timeoutPromise]);
+        stream.getTracks().forEach(track => track.stop());
+      } catch (err) {
+        // Fall back to manual input
+        alert("Camera access failed or not available. Please use the search bar to enter barcode manually, or use a USB barcode scanner.");
+      }
+    } else {
+      // BarcodeDetector not supported - prompt for manual input
+      const manualBarcode = prompt("Enter barcode manually (or use USB barcode scanner - it will type automatically):");
+      if (manualBarcode) {
+        setSearch(manualBarcode);
+      }
+    }
+  };
+
   return (
     <div>
       <TopBar title="Point of Sale" subtitle="Fast checkout processing" />
@@ -129,7 +191,10 @@ export default function POSPage() {
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
             </div>
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
+            <button 
+              onClick={handleBarcodeScan}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50"
+            >
               <Barcode size={16} />
               Scan
             </button>

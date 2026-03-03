@@ -58,6 +58,7 @@ export interface Sale {
   paymentMethod: "Cash" | "Card" | "M-Pesa";
   paymentStatus: "Paid" | "Pending" | "Refunded";
   reference?: string;
+  date: string;
   createdAt: string;
 }
 

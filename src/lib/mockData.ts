@@ -35,7 +35,7 @@ export const sales: Sale[] = [
       { productId: "p3", productName: "Sugar 1kg", quantity: 1, unitPrice: 145, vatAmount: 0, totalPrice: 145 },
     ],
     totalAmount: 495, vatAmount: 48.28, discountAmount: 0, paymentMethod: "Cash", paymentStatus: "Paid",
-    createdAt: "2026-03-03T08:30:00Z"
+    createdAt: "2026-03-03T08:30:00Z", date: "2026-03-03"
   },
   {
     id: "S-2026-002", branchId: "b1", cashier: "Peter Kamau", customer: "John Doe",
@@ -44,7 +44,7 @@ export const sales: Sale[] = [
       { productId: "p5", productName: "Bread Loaf", quantity: 2, unitPrice: 60, vatAmount: 0, totalPrice: 120 },
     ],
     totalAmount: 870, vatAmount: 103.45, discountAmount: 0, paymentMethod: "M-Pesa", paymentStatus: "Paid",
-    reference: "QHJ7K9L2", createdAt: "2026-03-03T09:15:00Z"
+    reference: "QHJ7K9L2", createdAt: "2026-03-03T09:15:00Z", date: "2026-03-02"
   },
   {
     id: "S-2026-003", branchId: "b2", cashier: "Jane Wanjiku", customer: "Mary Njeri",
@@ -53,7 +53,7 @@ export const sales: Sale[] = [
       { productId: "p8", productName: "Nails 2 inch (1kg)", quantity: 2, unitPrice: 160, vatAmount: 44.14, totalPrice: 320 },
     ],
     totalAmount: 4070, vatAmount: 561.38, discountAmount: 200, paymentMethod: "Card", paymentStatus: "Paid",
-    createdAt: "2026-03-03T10:00:00Z"
+    createdAt: "2026-03-03T10:00:00Z", date: "2026-03-01"
   },
   {
     id: "S-2026-004", branchId: "b1", cashier: "Peter Kamau",
@@ -62,7 +62,7 @@ export const sales: Sale[] = [
       { productId: "p4", productName: "Milk 500ml", quantity: 4, unitPrice: 65, vatAmount: 0, totalPrice: 260 },
     ],
     totalAmount: 380, vatAmount: 0, discountAmount: 0, paymentMethod: "Cash", paymentStatus: "Paid",
-    createdAt: "2026-03-03T11:30:00Z"
+    createdAt: "2026-03-03T11:30:00Z", date: "2026-03-03"
   },
   {
     id: "S-2026-005", branchId: "b3", cashier: "John Mwangi",
@@ -71,7 +71,7 @@ export const sales: Sale[] = [
       { productId: "p10", productName: "Washing Powder 1kg", quantity: 2, unitPrice: 220, vatAmount: 60.69, totalPrice: 440 },
     ],
     totalAmount: 1140, vatAmount: 157.24, discountAmount: 0, paymentMethod: "Cash", paymentStatus: "Paid",
-    createdAt: "2026-03-02T14:00:00Z"
+    createdAt: "2026-03-02T14:00:00Z", date: "2026-03-02"
   },
 ];
 

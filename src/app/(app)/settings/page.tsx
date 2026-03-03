@@ -1,20 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/TopBar";
-import { branches } from "@/lib/mockData";
+import { branches as initialBranches } from "@/lib/mockData";
 import {
   Building2, Bell, Shield, Printer, Globe, Database,
   Save, Plus, Edit2, Trash2, X, CheckCircle, Zap, CreditCard, Smartphone, FileText
 } from "lucide-react";
 
-const settingsTabs = ["Business Info", "Branches", "Notifications", "Receipt Settings", "Payment Methods", "System"];
+interface Branch {
+  id: string;
+  name: string;
+  location: string;
+  phone: string;
+  email: string;
+  manager: string;
+}
 
-export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("Business Info");
-  const [saved, setSaved] = useState(false);
-
-  const [businessInfo, setBusinessInfo] = useState({
+const defaultSettings = {
+  businessInfo: {
     name: "Forbes Agencies Limited",
     tradingName: "Lexintel POS",
     kraPin: "P051234567A",
@@ -26,35 +30,31 @@ export default function SettingsPage() {
     currency: "KES",
     timezone: "Africa/Nairobi",
     fiscalYear: "January - December",
-  });
-
-  const [receiptSettings, setReceiptSettings] = useState({
+  },
+  receiptSettings: {
     showLogo: true,
     showVAT: true,
     showBarcode: false,
     footerMessage: "Thank you for shopping with us!",
     headerMessage: "LEXINTEL POS",
     printCopies: "1",
-  });
-
-  const [notifications, setNotifications] = useState({
+  },
+  notifications: {
     lowStockAlerts: true,
     dailySalesReport: true,
     newUserAlert: true,
     paymentConfirmation: true,
     emailReports: false,
     smsAlerts: false,
-  });
-
-  const [paymentMethods, setPaymentMethods] = useState([
+  },
+  paymentMethods: [
     { id: "cash", name: "Cash", enabled: true, icon: "Banknote" },
     { id: "mpesa", name: "M-Pesa", enabled: true, icon: "Smartphone" },
     { id: "card", name: "Card", enabled: true, icon: "CreditCard" },
     { id: "bank", name: "Bank Transfer", enabled: false, icon: "Building2" },
     { id: "credit", name: "Credit Account", enabled: false, icon: "FileText" },
-  ]);
-
-  const [mpesaSettings, setMpesaSettings] = useState({
+  ],
+  mpesaSettings: {
     enabled: true,
     businessNumber: "123456",
     consumerKey: "",
@@ -62,10 +62,141 @@ export default function SettingsPage() {
     passkey: "",
     stkPush: true,
     stkPull: false,
-  });
+  },
+  branches: initialBranches as Branch[],
+  businessLogo: null as string | null,
+  footerImage: null as string | null,
+};
 
-  const [businessLogo, setBusinessLogo] = useState<string | null>(null);
-  const [footerImage, setFooterImage] = useState<string | null>(null);
+// Load settings from localStorage
+const loadSettings = () => {
+  if (typeof window === "undefined") return defaultSettings;
+  const saved = localStorage.getItem("lexintel-settings");
+  if (saved) {
+    try {
+      return { ...defaultSettings, ...JSON.parse(saved) };
+    } catch {
+      return defaultSettings;
+    }
+  }
+  return defaultSettings;
+};
+
+const settingsTabs = ["Business Info", "Branches", "Notifications", "Receipt Settings", "Payment Methods", "System"];
+
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState("Business Info");
+  const [saved, setSaved] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  
+  // Load settings from localStorage on mount
+  const [businessInfo, setBusinessInfo] = useState(defaultSettings.businessInfo);
+  const [receiptSettings, setReceiptSettings] = useState(defaultSettings.receiptSettings);
+  const [notifications, setNotifications] = useState(defaultSettings.notifications);
+  const [paymentMethods, setPaymentMethods] = useState(defaultSettings.paymentMethods);
+  const [mpesaSettings, setMpesaSettings] = useState(defaultSettings.mpesaSettings);
+  const [branches, setBranches] = useState<Branch[]>(defaultSettings.branches);
+  const [businessLogo, setBusinessLogo] = useState<string | null>(defaultSettings.businessLogo);
+  const [footerImage, setFooterImage] = useState<string | null>(defaultSettings.footerImage);
+  const [showBranchModal, setShowBranchModal] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [backupLoading, setBackupLoading] = useState(false);
+
+  useEffect(() => {
+    const loaded = loadSettings();
+    setBusinessInfo(loaded.businessInfo);
+    setReceiptSettings(loaded.receiptSettings);
+    setNotifications(loaded.notifications);
+    setPaymentMethods(loaded.paymentMethods);
+    setMpesaSettings(loaded.mpesaSettings);
+    setBranches(loaded.branches);
+    setBusinessLogo(loaded.businessLogo);
+    setFooterImage(loaded.footerImage);
+  }, []);
+
+  // Save settings to localStorage
+  const saveSettings = () => {
+    const settings = {
+      businessInfo,
+      receiptSettings,
+      notifications,
+      paymentMethods,
+      mpesaSettings,
+      branches,
+      businessLogo,
+      footerImage,
+    };
+    localStorage.setItem("lexintel-settings", JSON.stringify(settings));
+    setSaveMessage("Settings saved successfully!");
+    setSaved(true);
+    setTimeout(() => {
+      setSaved(false);
+      setSaveMessage("");
+    }, 3000);
+  };
+
+  const handleBackup = () => {
+    setBackupLoading(true);
+    // Create backup data
+    const backupData = {
+      businessInfo,
+      receiptSettings,
+      notifications,
+      paymentMethods,
+      mpesaSettings,
+      branches,
+      businessLogo,
+      footerImage,
+      exportedAt: new Date().toISOString(),
+    };
+    
+    // Create and download JSON file
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `lexintel-backup-${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    setTimeout(() => {
+      setBackupLoading(false);
+      setSaveMessage("Backup downloaded successfully!");
+      setSaved(true);
+      setTimeout(() => {
+        setSaved(false);
+        setSaveMessage("");
+      }, 3000);
+    }, 1500);
+  };
+
+  const handleAddBranch = () => {
+    setEditingBranch(null);
+    setShowBranchModal(true);
+  };
+
+  const handleEditBranch = (branch: Branch) => {
+    setEditingBranch(branch);
+    setShowBranchModal(true);
+  };
+
+  const handleDeleteBranch = (id: string) => {
+    if (confirm("Are you sure you want to delete this branch?")) {
+      setBranches(branches.filter(b => b.id !== id));
+    }
+  };
+
+  const handleSaveBranch = (branch: Branch) => {
+    if (editingBranch) {
+      setBranches(branches.map(b => b.id === branch.id ? branch : b));
+    } else {
+      setBranches([...branches, { ...branch, id: `b${Date.now()}` }]);
+    }
+    setShowBranchModal(false);
+    setEditingBranch(null);
+  };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,11 +218,6 @@ export default function SettingsPage() {
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
   };
 
   return (
@@ -150,7 +276,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                     <button
-                      onClick={handleSave}
+                      onClick={saveSettings}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
                       style={{ backgroundColor: "#1a3a5c" }}
                     >
@@ -235,6 +361,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-slate-500 mt-0.5">Manage your business locations</p>
                   </div>
                   <button
+                    onClick={handleAddBranch}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
                     style={{ backgroundColor: "#1a3a5c" }}
                   >
@@ -256,10 +383,16 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <button className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors">
+                        <button 
+                          onClick={() => handleEditBranch(branch)}
+                          className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                        >
                           <Edit2 size={14} />
                         </button>
-                        <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <button 
+                          onClick={() => handleDeleteBranch(branch.id)}
+                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -267,6 +400,15 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Branch Modal */}
+            {showBranchModal && (
+              <BranchModal
+                branch={editingBranch}
+                onSave={handleSaveBranch}
+                onClose={() => { setShowBranchModal(false); setEditingBranch(null); }}
+              />
             )}
 
             {/* Notifications */}
@@ -278,7 +420,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-slate-500 mt-0.5">Configure alerts and notifications</p>
                   </div>
                   <button
-                    onClick={handleSave}
+                    onClick={saveSettings}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
                     style={{ backgroundColor: "#1a3a5c" }}
                   >
@@ -328,7 +470,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-slate-500 mt-0.5">Customize your receipt layout</p>
                   </div>
                   <button
-                    onClick={handleSave}
+                    onClick={saveSettings}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
                     style={{ backgroundColor: "#1a3a5c" }}
                   >
@@ -420,7 +562,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-slate-500 mt-0.5">Configure accepted payment options</p>
                   </div>
                   <button
-                    onClick={handleSave}
+                    onClick={saveSettings}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
                     style={{ backgroundColor: "#1a3a5c" }}
                   >
@@ -580,9 +722,22 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="mt-6 grid grid-cols-2 gap-3">
-                  <button className="flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50">
-                    <Database size={14} />
-                    Backup Now
+                  <button 
+                    onClick={handleBackup}
+                    disabled={backupLoading}
+                    className="flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {backupLoading ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        Backing up...
+                      </>
+                    ) : (
+                      <>
+                        <Database size={14} />
+                        Backup Now
+                      </>
+                    )}
                   </button>
                   <button className="flex items-center justify-center gap-2 py-2.5 border border-red-200 rounded-xl text-sm text-red-600 hover:bg-red-50">
                     <X size={14} />
@@ -604,6 +759,111 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Branch Modal Component
+function BranchModal({ branch, onSave, onClose }: { branch: Branch | null; onSave: (branch: Branch) => void; onClose: () => void }) {
+  const [formData, setFormData] = useState<Branch>(
+    branch || { id: "", name: "", location: "", phone: "", email: "", manager: "" }
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.name && formData.location) {
+      onSave(formData);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-slate-800">
+            {branch ? "Edit Branch" : "Add New Branch"}
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
+            <X size={18} className="text-slate-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Branch Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              placeholder="e.g., Main Branch"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
+            <input
+              type="text"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              placeholder="e.g., Nairobi, Kenya"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+            <input
+              type="text"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              placeholder="e.g., +254 700 000 000"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              placeholder="e.g., branch@company.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Branch Manager</label>
+            <input
+              type="text"
+              value={formData.manager}
+              onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+              placeholder="e.g., John Doe"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2 text-white rounded-lg font-medium"
+              style={{ backgroundColor: "#1a3a5c" }}
+            >
+              {branch ? "Update Branch" : "Add Branch"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
