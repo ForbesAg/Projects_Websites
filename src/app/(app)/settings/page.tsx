@@ -5,10 +5,10 @@ import { TopBar } from "@/components/layout/TopBar";
 import { branches } from "@/lib/mockData";
 import {
   Building2, Bell, Shield, Printer, Globe, Database,
-  Save, Plus, Edit2, Trash2, X, CheckCircle, Zap
+  Save, Plus, Edit2, Trash2, X, CheckCircle, Zap, CreditCard, Smartphone, FileText
 } from "lucide-react";
 
-const settingsTabs = ["Business Info", "Branches", "Notifications", "Receipt Settings", "System"];
+const settingsTabs = ["Business Info", "Branches", "Notifications", "Receipt Settings", "Payment Methods", "System"];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("Business Info");
@@ -46,6 +46,49 @@ export default function SettingsPage() {
     smsAlerts: false,
   });
 
+  const [paymentMethods, setPaymentMethods] = useState([
+    { id: "cash", name: "Cash", enabled: true, icon: "Banknote" },
+    { id: "mpesa", name: "M-Pesa", enabled: true, icon: "Smartphone" },
+    { id: "card", name: "Card", enabled: true, icon: "CreditCard" },
+    { id: "bank", name: "Bank Transfer", enabled: false, icon: "Building2" },
+    { id: "credit", name: "Credit Account", enabled: false, icon: "FileText" },
+  ]);
+
+  const [mpesaSettings, setMpesaSettings] = useState({
+    enabled: true,
+    businessNumber: "123456",
+    consumerKey: "",
+    consumerSecret: "",
+    passkey: "",
+    stkPush: true,
+    stkPull: false,
+  });
+
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null);
+  const [footerImage, setFooterImage] = useState<string | null>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBusinessLogo(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFooterUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFooterImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -66,6 +109,7 @@ export default function SettingsPage() {
                   "Branches": <Globe size={16} />,
                   "Notifications": <Bell size={16} />,
                   "Receipt Settings": <Printer size={16} />,
+                  "Payment Methods": <CreditCard size={16} />,
                   "System": <Database size={16} />,
                 };
                 return (
@@ -117,6 +161,44 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-5">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-slate-600 mb-2">Business Logo</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center bg-slate-50 overflow-hidden">
+                        {businessLogo ? (
+                          <img src={businessLogo} alt="Logo" className="w-full h-full object-contain" />
+                        ) : (
+                          <Building2 size={24} className="text-slate-300" />
+                        )}
+                      </div>
+                      <div>
+                        <label className="cursor-pointer px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 inline-block">
+                          Upload Logo
+                          <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                        </label>
+                        <p className="text-xs text-slate-400 mt-1">PNG, JPG up to 2MB</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-slate-600 mb-2">Footer Image (Receipt)</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-32 h-12 rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center bg-slate-50 overflow-hidden">
+                        {footerImage ? (
+                          <img src={footerImage} alt="Footer" className="w-full h-full object-contain" />
+                        ) : (
+                          <span className="text-xs text-slate-300">No image</span>
+                        )}
+                      </div>
+                      <div>
+                        <label className="cursor-pointer px-4 py-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 inline-block">
+                          Upload Image
+                          <input type="file" accept="image/*" onChange={handleFooterUpload} className="hidden" />
+                        </label>
+                        <p className="text-xs text-slate-400 mt-1">PNG, JPG up to 1MB</p>
+                      </div>
+                    </div>
+                  </div>
                   {[
                     { label: "Company Name", key: "name" },
                     { label: "Trading Name", key: "tradingName" },
@@ -324,6 +406,154 @@ export default function SettingsPage() {
                       <div className="border-t border-dashed border-slate-300 my-2"></div>
                       <p className="text-center text-slate-500">{receiptSettings.footerMessage}</p>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Payment Methods */}
+            {activeTab === "Payment Methods" && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">Payment Methods</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Configure accepted payment options</p>
+                  </div>
+                  <button
+                    onClick={handleSave}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
+                    style={{ backgroundColor: "#1a3a5c" }}
+                  >
+                    <Save size={14} />
+                    Save
+                  </button>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  <p className="text-xs font-medium text-slate-600 mb-2">Enabled Payment Methods</p>
+                  {paymentMethods.map((method) => (
+                    <div key={method.id} className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-100">
+                          {method.icon === "Banknote" && <span className="text-lg">💵</span>}
+                          {method.icon === "Smartphone" && <span className="text-lg">📱</span>}
+                          {method.icon === "CreditCard" && <span className="text-lg">💳</span>}
+                          {method.icon === "Building2" && <span className="text-lg">🏦</span>}
+                          {method.icon === "FileText" && <span className="text-lg">📄</span>}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{method.name}</p>
+                          <p className="text-xs text-slate-400">
+                            {method.id === "cash" && "Physical cash payments"}
+                            {method.id === "mpesa" && "M-Pesa STK Push/Pull"}
+                            {method.id === "card" && "Credit/Debit card payments"}
+                            {method.id === "bank" && "Direct bank transfers"}
+                            {method.id === "credit" && "Customer credit account"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setPaymentMethods(prev => prev.map(m => 
+                          m.id === method.id ? { ...m, enabled: !m.enabled } : m
+                        ))}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${method.enabled ? "bg-sky-500" : "bg-slate-200"}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${method.enabled ? "translate-x-5" : "translate-x-0.5"}`}
+                        ></span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* M-Pesa Settings */}
+                <div className="border-t border-slate-200 pt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Smartphone size={18} className="text-emerald-600" />
+                    <h4 className="font-semibold text-slate-800">M-Pesa Integration</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4">Configure M-Pesa STK Push for automatic payment requests</p>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">Enable M-Pesa</p>
+                        <p className="text-xs text-slate-400">Accept M-Pesa payments</p>
+                      </div>
+                      <button
+                        onClick={() => setMpesaSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${mpesaSettings.enabled ? "bg-sky-500" : "bg-slate-200"}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${mpesaSettings.enabled ? "translate-x-5" : "translate-x-0.5"}`}
+                        ></span>
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">STK Push</p>
+                        <p className="text-xs text-slate-400">Auto-send payment request</p>
+                      </div>
+                      <button
+                        onClick={() => setMpesaSettings(prev => ({ ...prev, stkPush: !prev.stkPush }))}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${mpesaSettings.stkPush ? "bg-sky-500" : "bg-slate-200"}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${mpesaSettings.stkPush ? "translate-x-5" : "translate-x-0.5"}`}
+                        ></span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Business Number (Till/Paybill)</label>
+                      <input
+                        type="text"
+                        value={mpesaSettings.businessNumber}
+                        onChange={(e) => setMpesaSettings(prev => ({ ...prev, businessNumber: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        placeholder="123456"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Consumer Key</label>
+                      <input
+                        type="text"
+                        value={mpesaSettings.consumerKey}
+                        onChange={(e) => setMpesaSettings(prev => ({ ...prev, consumerKey: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        placeholder="Enter consumer key"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Consumer Secret</label>
+                      <input
+                        type="password"
+                        value={mpesaSettings.consumerSecret}
+                        onChange={(e) => setMpesaSettings(prev => ({ ...prev, consumerSecret: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        placeholder="Enter consumer secret"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Passkey</label>
+                      <input
+                        type="password"
+                        value={mpesaSettings.passkey}
+                        onChange={(e) => setMpesaSettings(prev => ({ ...prev, passkey: e.target.value }))}
+                        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        placeholder="Enter passkey"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-xs font-medium text-amber-800">Note:</p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      To enable M-Pesa payments, you need a Daraja API account from Safaricom. 
+                      Visit developer.safaricom.co.ke to create your app and get credentials.
+                    </p>
                   </div>
                 </div>
               </div>
