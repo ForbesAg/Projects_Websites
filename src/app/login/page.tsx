@@ -1,32 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
+import { Zap, Eye, EyeOff, Lock, Mail, Shield, Wifi, WifiOff } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@lexintel.co.ke");
-  const [password, setPassword] = useState("admin123");
+  const { login, user, loading } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      if (user.mustChangePassword) {
+        router.push("/change-password");
+      } else {
+        router.push("/dashboard");
+      }
+    }
+  }, [user, loading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
     setError("");
 
-    // Simulate authentication
-    await new Promise((r) => setTimeout(r, 1000));
+    const result = await login(email, password);
 
-    if (email === "admin@lexintel.co.ke" && password === "admin123") {
-      router.push("/dashboard");
+    if (result.success) {
+      // Redirect handled by useEffect above
     } else {
-      setError("Invalid email or password. Try admin@lexintel.co.ke / admin123");
-      setLoading(false);
+      setError(result.error || "Login failed");
+      setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#f0f4f8" }}>
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "#1a3a5c" }}>
+            <Zap className="w-7 h-7 text-white" />
+          </div>
+          <p className="text-slate-500 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#f0f4f8" }}>
@@ -74,7 +99,14 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-2">
+            <Wifi size={14} className="text-emerald-400" />
+            <p className="text-emerald-400 text-sm font-medium">Local Network Mode</p>
+          </div>
           <p className="text-blue-400 text-sm">
+            Works offline · No internet required · LAN ready
+          </p>
+          <p className="text-blue-500 text-xs mt-2">
             © 2026 Forbes Agencies Limited · www.forbesa.co.ke
           </p>
         </div>
@@ -120,6 +152,7 @@ export default function LoginPage() {
                     className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
                     placeholder="your@email.com"
                     required
+                    autoComplete="email"
                   />
                 </div>
               </div>
@@ -137,6 +170,7 @@ export default function LoginPage() {
                     className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
                     placeholder="••••••••"
                     required
+                    autoComplete="current-password"
                   />
                   <button
                     type="button"
@@ -148,23 +182,13 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-slate-300 text-sky-500" />
-                  <span className="text-sm text-slate-600">Remember me</span>
-                </label>
-                <button type="button" className="text-sm font-medium" style={{ color: "#0ea5e9" }}>
-                  Forgot password?
-                </button>
-              </div>
-
               <button
                 type="submit"
-                disabled={loading}
+                disabled={submitting}
                 className="w-full py-3 rounded-xl text-white font-semibold text-sm transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-                style={{ backgroundColor: loading ? "#64748b" : "#1a3a5c" }}
+                style={{ backgroundColor: submitting ? "#64748b" : "#1a3a5c" }}
               >
-                {loading ? (
+                {submitting ? (
                   <span className="flex items-center justify-center gap-2">
                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -181,16 +205,20 @@ export default function LoginPage() {
             <div className="mt-6 p-4 bg-slate-50 rounded-xl">
               <div className="flex items-center gap-2 mb-2">
                 <Shield size={14} className="text-slate-500" />
-                <p className="text-xs font-medium text-slate-600">Demo Credentials</p>
+                <p className="text-xs font-medium text-slate-600">Default Admin Credentials</p>
               </div>
-              <p className="text-xs text-slate-500">Email: admin@lexintel.co.ke</p>
-              <p className="text-xs text-slate-500">Password: admin123</p>
+              <p className="text-xs text-slate-500">Email: admin@lexintel.local</p>
+              <p className="text-xs text-slate-500">Password: Admin@1234</p>
+              <p className="text-xs text-amber-600 mt-1">⚠ Change password after first login</p>
             </div>
           </div>
 
-          <p className="text-center text-xs text-slate-400 mt-6">
-            Secured by Lexintel · Role-based Access Control
-          </p>
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <WifiOff size={12} className="text-slate-400" />
+            <p className="text-center text-xs text-slate-400">
+              Local deployment · No internet required · Secured by Lexintel
+            </p>
+          </div>
         </div>
       </div>
     </div>

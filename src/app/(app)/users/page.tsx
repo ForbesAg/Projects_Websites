@@ -1,14 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Badge } from "@/components/ui/Badge";
-import { users as initialUsers, branches } from "@/lib/mockData";
-import type { User, UserRole } from "@/lib/types";
+import type { UserRole } from "@/lib/types";
 import {
   Search, Plus, Edit2, Trash2, X, Save,
-  Shield, User as UserIcon, Key, CheckCircle, XCircle
+  Shield, CheckCircle, XCircle, RefreshCw, Key
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+
+interface DBUser {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  branch: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+}
 
 const roles: UserRole[] = ["Admin", "Manager", "Cashier", "Accountant"];
 
@@ -19,20 +29,44 @@ const rolePermissions: Record<UserRole, string[]> = {
   Accountant: ["Financial reports", "Accounting entries", "Expense management", "P&L access", "Balance sheet"],
 };
 
-const roleColors: Record<UserRole, { bg: string; text: string; variant: "success" | "info" | "warning" | "default" }> = {
-  Admin: { bg: "#fee2e2", text: "#dc2626", variant: "danger" as "success" },
-  Manager: { bg: "#dbeafe", text: "#2563eb", variant: "info" },
-  Cashier: { bg: "#d1fae5", text: "#059669", variant: "success" },
-  Accountant: { bg: "#ede9fe", text: "#7c3aed", variant: "warning" as "success" },
+const roleColors: Record<UserRole, { bg: string; text: string }> = {
+  Admin: { bg: "#fee2e2", text: "#dc2626" },
+  Manager: { bg: "#dbeafe", text: "#2563eb" },
+  Cashier: { bg: "#d1fae5", text: "#059669" },
+  Accountant: { bg: "#ede9fe", text: "#7c3aed" },
 };
 
+const branches = ["Main Branch", "Westlands Branch", "Mombasa Branch"];
+
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>(initialUsers);
+  const { user: currentUser } = useAuth();
+  const [users, setUsers] = useState<DBUser[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState<string>("All");
   const [showModal, setShowModal] = useState(false);
-  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editUser, setEditUser] = useState<Partial<DBUser> & { password?: string; resetPassword?: string } | null>(null);
   const [activeTab, setActiveTab] = useState<"Users" | "Roles">("Users");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("/api/users");
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users);
+      }
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const filteredUsers = users.filter((u) => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
@@ -41,27 +75,81 @@ export default function UsersPage() {
   });
 
   const openAdd = () => {
-    setEditUser({ id: "", name: "", email: "", role: "Cashier", branch: "Main Branch" });
+    setEditUser({ name: "", email: "", role: "Cashier", branch: "Main Branch", password: "" });
+    setError("");
     setShowModal(true);
   };
 
-  const openEdit = (user: User) => {
-    setEditUser({ ...user });
+  const openEdit = (user: DBUser) => {
+    setEditUser({ ...user, resetPassword: "" });
+    setError("");
     setShowModal(true);
   };
 
-  const saveUser = () => {
+  const saveUser = async () => {
     if (!editUser) return;
-    if (!editUser.id) {
-      setUsers((prev) => [...prev, { ...editUser, id: `u${Date.now()}` }]);
-    } else {
-      setUsers((prev) => prev.map((u) => (u.id === editUser.id ? editUser : u)));
+    setSaving(true);
+    setError("");
+
+    try {
+      let res;
+      if (!editUser.id) {
+        // Create new user
+        res = await fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: editUser.name,
+            email: editUser.email,
+            role: editUser.role,
+            branch: editUser.branch,
+            password: editUser.password,
+          }),
+        });
+      } else {
+        // Update existing user
+        res = await fetch(`/api/users/${editUser.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: editUser.name,
+            email: editUser.email,
+            role: editUser.role,
+            branch: editUser.branch,
+            isActive: editUser.isActive,
+            resetPassword: editUser.resetPassword || undefined,
+          }),
+        });
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        await fetchUsers();
+        setShowModal(false);
+        setEditUser(null);
+      } else {
+        setError(data.error || "Failed to save user");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
     }
-    setShowModal(false);
-    setEditUser(null);
   };
 
-  const getRoleVariant = (role: UserRole) => {
+  const deleteUser = async (userId: number) => {
+    if (!confirm("Deactivate this user?")) return;
+    try {
+      const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchUsers();
+      }
+    } catch (err) {
+      console.error("Failed to delete user:", err);
+    }
+  };
+
+  const getRoleVariant = (role: UserRole): "success" | "info" | "warning" | "danger" | "default" => {
     const map: Record<UserRole, "success" | "info" | "warning" | "danger" | "default"> = {
       Admin: "danger",
       Manager: "info",
@@ -71,6 +159,8 @@ export default function UsersPage() {
     return map[role];
   };
 
+  const isAdmin = currentUser?.role === "Admin";
+
   return (
     <div>
       <TopBar title="Users & Roles" subtitle="Role-based access control" />
@@ -79,7 +169,7 @@ export default function UsersPage() {
         {/* Summary */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {roles.map((role) => {
-            const count = users.filter((u) => u.role === role).length;
+            const count = users.filter((u) => u.role === role && u.isActive).length;
             const colors = roleColors[role];
             return (
               <div key={role} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
@@ -139,66 +229,94 @@ export default function UsersPage() {
                       {roles.map((r) => <option key={r}>{r}</option>)}
                     </select>
                   </div>
-                  <button
-                    onClick={openAdd}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
-                    style={{ backgroundColor: "#1a3a5c" }}
-                  >
-                    <Plus size={14} />
-                    Add User
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={fetchUsers}
+                      className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+                    >
+                      <RefreshCw size={14} />
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={openAdd}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
+                        style={{ backgroundColor: "#1a3a5c" }}
+                      >
+                        <Plus size={14} />
+                        Add User
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-slate-50">
-                        {["User", "Email", "Role", "Branch", "Actions"].map((h) => (
-                          <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {filteredUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                                style={{ backgroundColor: "#1a3a5c" }}
-                              >
-                                {user.name.charAt(0)}
-                              </div>
-                              <span className="text-sm font-medium text-slate-800">{user.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{user.email}</td>
-                          <td className="px-4 py-3">
-                            <Badge variant={getRoleVariant(user.role)}>{user.role}</Badge>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{user.branch}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => openEdit(user)}
-                                className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                              <button
-                                onClick={() => setUsers((prev) => prev.filter((u) => u.id !== user.id))}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                disabled={user.role === "Admin"}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
+                {loading ? (
+                  <div className="text-center py-8 text-slate-400">Loading users...</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-slate-50">
+                          {["User", "Email", "Role", "Branch", "Status", "Actions"].map((h) => (
+                            <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">{h}</th>
+                          ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {filteredUsers.map((user) => (
+                          <tr key={user.id} className={`hover:bg-slate-50 transition-colors ${!user.isActive ? "opacity-50" : ""}`}>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                                  style={{ backgroundColor: "#1a3a5c" }}
+                                >
+                                  {user.name.charAt(0)}
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium text-slate-800">{user.name}</span>
+                                  {user.mustChangePassword && (
+                                    <span className="ml-2 text-xs text-amber-600">⚠ Must change pwd</span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{user.email}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant={getRoleVariant(user.role)}>{user.role}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{user.branch}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant={user.isActive ? "success" : "default"}>
+                                {user.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              {isAdmin && (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => openEdit(user)}
+                                    className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                                    title="Edit user"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteUser(user.id)}
+                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    disabled={user.id === currentUser?.id}
+                                    title="Deactivate user"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
@@ -215,7 +333,7 @@ export default function UsersPage() {
                         </div>
                         <div>
                           <h4 className="font-semibold text-slate-800">{role}</h4>
-                          <p className="text-xs text-slate-500">{users.filter((u) => u.role === role).length} users assigned</p>
+                          <p className="text-xs text-slate-500">{users.filter((u) => u.role === role && u.isActive).length} active users</p>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -225,7 +343,6 @@ export default function UsersPage() {
                             <span className="text-sm text-slate-600">{perm}</span>
                           </div>
                         ))}
-                        {/* Show some denied permissions for non-admin */}
                         {role !== "Admin" && (
                           <>
                             {["Delete records", "System settings"].filter((p) => !perms.includes(p)).slice(0, 2).map((perm) => (
@@ -259,11 +376,14 @@ export default function UsersPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Full Name</label>
                 <input
                   type="text"
-                  value={editUser.name}
+                  value={editUser.name || ""}
                   onChange={(e) => setEditUser((prev) => prev ? { ...prev, name: e.target.value } : prev)}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
@@ -272,7 +392,7 @@ export default function UsersPage() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Email Address</label>
                 <input
                   type="email"
-                  value={editUser.email}
+                  value={editUser.email || ""}
                   onChange={(e) => setEditUser((prev) => prev ? { ...prev, email: e.target.value } : prev)}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
@@ -280,7 +400,7 @@ export default function UsersPage() {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Role</label>
                 <select
-                  value={editUser.role}
+                  value={editUser.role || "Cashier"}
                   onChange={(e) => setEditUser((prev) => prev ? { ...prev, role: e.target.value as UserRole } : prev)}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                 >
@@ -290,21 +410,52 @@ export default function UsersPage() {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Branch</label>
                 <select
-                  value={editUser.branch}
+                  value={editUser.branch || "Main Branch"}
                   onChange={(e) => setEditUser((prev) => prev ? { ...prev, branch: e.target.value } : prev)}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                 >
-                  {branches.map((b) => <option key={b.id}>{b.name}</option>)}
+                  {branches.map((b) => <option key={b}>{b}</option>)}
                 </select>
               </div>
               {!editUser.id && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Temporary Password</label>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Initial Password <span className="text-slate-400">(user must change on first login)</span>
+                  </label>
                   <input
                     type="password"
-                    placeholder="Set initial password"
+                    value={editUser.password || ""}
+                    onChange={(e) => setEditUser((prev) => prev ? { ...prev, password: e.target.value } : prev)}
+                    placeholder="Min 8 characters"
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
+                </div>
+              )}
+              {editUser.id && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    <Key size={12} className="inline mr-1" />
+                    Reset Password <span className="text-slate-400">(leave blank to keep current)</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={editUser.resetPassword || ""}
+                    onChange={(e) => setEditUser((prev) => prev ? { ...prev, resetPassword: e.target.value } : prev)}
+                    placeholder="New password (optional)"
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                </div>
+              )}
+              {editUser.id && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isActive"
+                    checked={editUser.isActive !== false}
+                    onChange={(e) => setEditUser((prev) => prev ? { ...prev, isActive: e.target.checked } : prev)}
+                    className="rounded"
+                  />
+                  <label htmlFor="isActive" className="text-sm text-slate-600">Account Active</label>
                 </div>
               )}
             </div>
@@ -317,11 +468,12 @@ export default function UsersPage() {
               </button>
               <button
                 onClick={saveUser}
-                className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-70"
                 style={{ backgroundColor: "#1a3a5c" }}
               >
                 <Save size={14} />
-                Save User
+                {saving ? "Saving..." : "Save User"}
               </button>
             </div>
           </div>

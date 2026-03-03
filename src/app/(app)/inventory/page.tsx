@@ -1,24 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Badge } from "@/components/ui/Badge";
-import { products as initialProducts } from "@/lib/mockData";
 import type { Product } from "@/lib/types";
 import {
   Search, Plus, Edit2, Trash2, AlertTriangle, Package,
-  Filter, Download, Upload, X, Save, ChevronUp, ChevronDown
+  Download, Upload, X, Save, ChevronUp, ChevronDown, RefreshCw
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+
+interface DBProduct {
+  id: number;
+  name: string;
+  sku: string;
+  barcode: string;
+  category: string;
+  costPrice: number;
+  sellingPrice: number;
+  vatRate: number;
+  trackInventory: boolean;
+  quantity: number;
+  reorderLevel: number;
+  supplier: string;
+  expiryDate: string | null;
+}
 
 export default function InventoryPage() {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const { user } = useAuth();
+  const [products, setProducts] = useState<DBProduct[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterStock, setFilterStock] = useState("All");
   const [showModal, setShowModal] = useState(false);
-  const [editProduct, setEditProduct] = useState<Product | null>(null);
-  const [sortField, setSortField] = useState<keyof Product>("name");
+  const [editProduct, setEditProduct] = useState<Partial<DBProduct> | null>(null);
+  const [sortField, setSortField] = useState<keyof DBProduct>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const canEdit = user?.role === "Admin" || user?.role === "Manager";
+
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("/api/products");
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data.products);
+      }
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   const categories = ["All", ...Array.from(new Set(products.map((p) => p.category)))];
 
@@ -49,47 +89,82 @@ export default function InventoryPage() {
   const lowStockCount = products.filter((p) => p.quantity <= p.reorderLevel && p.quantity > 0).length;
   const outOfStockCount = products.filter((p) => p.quantity === 0).length;
 
-  const handleSort = (field: keyof Product) => {
+  const handleSort = (field: keyof DBProduct) => {
     if (sortField === field) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else { setSortField(field); setSortDir("asc"); }
   };
 
-  const SortIcon = ({ field }: { field: keyof Product }) => {
+  const SortIcon = ({ field }: { field: keyof DBProduct }) => {
     if (sortField !== field) return <ChevronUp size={12} className="text-slate-300" />;
     return sortDir === "asc" ? <ChevronUp size={12} className="text-slate-600" /> : <ChevronDown size={12} className="text-slate-600" />;
   };
 
   const openAdd = () => {
     setEditProduct({
-      id: "", name: "", sku: "", barcode: "", category: "", costPrice: 0,
+      name: "", sku: "", barcode: "", category: "General", costPrice: 0,
       sellingPrice: 0, vatRate: 16, trackInventory: true, quantity: 0,
       reorderLevel: 10, supplier: ""
     });
+    setError("");
     setShowModal(true);
   };
 
-  const openEdit = (product: Product) => {
+  const openEdit = (product: DBProduct) => {
+    if (!canEdit) return;
     setEditProduct({ ...product });
+    setError("");
     setShowModal(true);
   };
 
-  const saveProduct = () => {
+  const saveProduct = async () => {
     if (!editProduct) return;
-    if (!editProduct.id) {
-      const newProduct = { ...editProduct, id: `p${Date.now()}` };
-      setProducts((prev) => [...prev, newProduct]);
-    } else {
-      setProducts((prev) => prev.map((p) => (p.id === editProduct.id ? editProduct : p)));
+    setSaving(true);
+    setError("");
+
+    try {
+      let res;
+      if (!editProduct.id) {
+        res = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editProduct),
+        });
+      } else {
+        res = await fetch(`/api/products/${editProduct.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(editProduct),
+        });
+      }
+
+      const data = await res.json();
+      if (res.ok) {
+        await fetchProducts();
+        setShowModal(false);
+        setEditProduct(null);
+      } else {
+        setError(data.error || "Failed to save product");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSaving(false);
     }
-    setShowModal(false);
-    setEditProduct(null);
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  const deleteProduct = async (id: number) => {
+    if (!confirm("Deactivate this product?")) return;
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchProducts();
+      }
+    } catch (err) {
+      console.error("Failed to delete product:", err);
+    }
   };
 
-  const getStockStatus = (product: Product) => {
+  const getStockStatus = (product: DBProduct) => {
     if (product.quantity === 0) return { label: "Out of Stock", variant: "danger" as const };
     if (product.quantity <= product.reorderLevel) return { label: "Low Stock", variant: "warning" as const };
     return { label: "In Stock", variant: "success" as const };
@@ -148,105 +223,117 @@ export default function InventoryPage() {
               </select>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={fetchProducts}
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50"
+              >
+                <RefreshCw size={14} />
+              </button>
               <button className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
                 <Download size={14} />
                 Export
               </button>
-              <button className="flex items-center gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50">
-                <Upload size={14} />
-                Import
-              </button>
-              <button
-                onClick={openAdd}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
-                style={{ backgroundColor: "#1a3a5c" }}
-              >
-                <Plus size={14} />
-                Add Product
-              </button>
+              {canEdit && (
+                <button
+                  onClick={openAdd}
+                  className="flex items-center gap-2 px-4 py-2 text-sm text-white rounded-lg font-medium"
+                  style={{ backgroundColor: "#1a3a5c" }}
+                >
+                  <Plus size={14} />
+                  Add Product
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         {/* Products Table */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {[
-                    { label: "Product", field: "name" as keyof Product },
-                    { label: "SKU", field: "sku" as keyof Product },
-                    { label: "Category", field: "category" as keyof Product },
-                    { label: "Cost Price", field: "costPrice" as keyof Product },
-                    { label: "Selling Price", field: "sellingPrice" as keyof Product },
-                    { label: "Stock", field: "quantity" as keyof Product },
-                    { label: "Reorder Level", field: "reorderLevel" as keyof Product },
-                    { label: "Status", field: null },
-                    { label: "Actions", field: null },
-                  ].map((col) => (
-                    <th
-                      key={col.label}
-                      className={`text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 ${col.field ? "cursor-pointer hover:text-slate-700" : ""}`}
-                      onClick={() => col.field && handleSort(col.field)}
-                    >
-                      <div className="flex items-center gap-1">
-                        {col.label}
-                        {col.field && <SortIcon field={col.field} />}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filtered.map((product) => {
-                  const status = getStockStatus(product);
-                  return (
-                    <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800">{product.name}</p>
-                          <p className="text-xs text-slate-400">{product.barcode}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-mono text-slate-600">{product.sku}</td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{product.category}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700">KES {product.costPrice}</td>
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-800">KES {product.sellingPrice}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm font-bold ${product.quantity === 0 ? "text-red-600" : product.quantity <= product.reorderLevel ? "text-amber-600" : "text-slate-800"}`}>
-                          {product.quantity}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">{product.reorderLevel}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEdit(product)}
-                            className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                          <button
-                            onClick={() => deleteProduct(product.id)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
+          {loading ? (
+            <div className="text-center py-12 text-slate-400">Loading products...</div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      {[
+                        { label: "Product", field: "name" as keyof DBProduct },
+                        { label: "SKU", field: "sku" as keyof DBProduct },
+                        { label: "Category", field: "category" as keyof DBProduct },
+                        { label: "Cost", field: "costPrice" as keyof DBProduct },
+                        { label: "Price", field: "sellingPrice" as keyof DBProduct },
+                        { label: "Stock", field: "quantity" as keyof DBProduct },
+                        { label: "Reorder", field: "reorderLevel" as keyof DBProduct },
+                        { label: "Status", field: null },
+                        { label: "Actions", field: null },
+                      ].map((col) => (
+                        <th
+                          key={col.label}
+                          className={`text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 ${col.field ? "cursor-pointer hover:text-slate-700" : ""}`}
+                          onClick={() => col.field && handleSort(col.field)}
+                        >
+                          <div className="flex items-center gap-1">
+                            {col.label}
+                            {col.field && <SortIcon field={col.field} />}
+                          </div>
+                        </th>
+                      ))}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
-            <p className="text-xs text-slate-500">Showing {filtered.length} of {products.length} products</p>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filtered.map((product) => {
+                      const status = getStockStatus(product);
+                      return (
+                        <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div>
+                              <p className="text-sm font-medium text-slate-800">{product.name}</p>
+                              <p className="text-xs text-slate-400">{product.barcode}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-mono text-slate-600">{product.sku}</td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{product.category}</td>
+                          <td className="px-4 py-3 text-sm text-slate-700">KES {product.costPrice}</td>
+                          <td className="px-4 py-3 text-sm font-semibold text-slate-800">KES {product.sellingPrice}</td>
+                          <td className="px-4 py-3">
+                            <span className={`text-sm font-bold ${product.quantity === 0 ? "text-red-600" : product.quantity <= product.reorderLevel ? "text-amber-600" : "text-slate-800"}`}>
+                              {product.quantity}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{product.reorderLevel}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={status.variant}>{status.label}</Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            {canEdit && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => openEdit(product)}
+                                  className="p-1.5 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                                <button
+                                  onClick={() => deleteProduct(product.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                <p className="text-xs text-slate-500">Showing {filtered.length} of {products.length} products</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -262,34 +349,39 @@ export default function InventoryPage() {
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-4">
-              {[
-                { label: "Product Name", key: "name", type: "text", full: true },
-                { label: "SKU", key: "sku", type: "text" },
-                { label: "Barcode", key: "barcode", type: "text" },
-                { label: "Category", key: "category", type: "text" },
-                { label: "Supplier", key: "supplier", type: "text" },
-                { label: "Cost Price (KES)", key: "costPrice", type: "number" },
-                { label: "Selling Price (KES)", key: "sellingPrice", type: "number" },
-                { label: "VAT Rate (%)", key: "vatRate", type: "number" },
-                { label: "Current Stock", key: "quantity", type: "number" },
-                { label: "Reorder Level", key: "reorderLevel", type: "number" },
-                { label: "Expiry Date", key: "expiryDate", type: "date" },
-              ].map((field) => (
-                <div key={field.key} className={field.full ? "col-span-2" : ""}>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
-                  <input
-                    type={field.type}
-                    value={String((editProduct as unknown as Record<string, unknown>)[field.key] ?? "")}
-                    onChange={(e) =>
-                      setEditProduct((prev) =>
-                        prev ? { ...prev, [field.key]: field.type === "number" ? parseFloat(e.target.value) || 0 : e.target.value } : prev
-                      )
-                    }
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-              ))}
+            <div className="p-6 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: "Product Name", key: "name", type: "text", full: true },
+                  { label: "SKU", key: "sku", type: "text" },
+                  { label: "Barcode", key: "barcode", type: "text" },
+                  { label: "Category", key: "category", type: "text" },
+                  { label: "Supplier", key: "supplier", type: "text" },
+                  { label: "Cost Price (KES)", key: "costPrice", type: "number" },
+                  { label: "Selling Price (KES)", key: "sellingPrice", type: "number" },
+                  { label: "VAT Rate (%)", key: "vatRate", type: "number" },
+                  { label: "Current Stock", key: "quantity", type: "number" },
+                  { label: "Reorder Level", key: "reorderLevel", type: "number" },
+                  { label: "Expiry Date", key: "expiryDate", type: "date" },
+                ].map((field) => (
+                  <div key={field.key} className={field.full ? "col-span-2" : ""}>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">{field.label}</label>
+                    <input
+                      type={field.type}
+                      value={String(editProduct[field.key as keyof DBProduct] ?? "")}
+                      onChange={(e) =>
+                        setEditProduct((prev) =>
+                          prev ? { ...prev, [field.key]: field.type === "number" ? parseFloat(e.target.value) || 0 : e.target.value } : prev
+                        )
+                      }
+                      className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="flex gap-3 p-6 border-t border-slate-100">
               <button
@@ -300,11 +392,12 @@ export default function InventoryPage() {
               </button>
               <button
                 onClick={saveProduct}
-                className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
+                disabled={saving}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-70"
                 style={{ backgroundColor: "#1a3a5c" }}
               >
                 <Save size={14} />
-                Save Product
+                {saving ? "Saving..." : "Save Product"}
               </button>
             </div>
           </div>
