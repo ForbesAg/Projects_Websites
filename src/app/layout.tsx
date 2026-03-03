@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Next.js Template",
-  description: "A minimal Next.js starter template",
+  title: "Lexintel POS – Integrated Business Management System",
+  description: "Lexintel – Point of Sale, Accounts & Inventory Management System by Forbes Agencies Limited",
 };
 
 export default function RootLayout({

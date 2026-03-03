@@ -1,1 +1,48 @@
 @import "tailwindcss";
+
+:root {
+  --lexintel-primary: #1a3a5c;
+  --lexintel-secondary: #0ea5e9;
+  --lexintel-accent: #f59e0b;
+  --lexintel-success: #10b981;
+  --lexintel-danger: #ef4444;
+  --lexintel-warning: #f59e0b;
+  --lexintel-bg: #f0f4f8;
+  --lexintel-sidebar: #1a3a5c;
+  --lexintel-sidebar-hover: #243f63;
+  --lexintel-card: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--lexintel-bg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
