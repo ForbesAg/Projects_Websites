@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Badge } from "@/components/ui/Badge";
 import { products as allProducts } from "@/lib/mockData";
@@ -15,6 +15,24 @@ const categories = ["All", "Flour & Grains", "Cooking Oils", "Sugar & Sweeteners
 
 export default function POSPage() {
   const [search, setSearch] = useState("");
+  // Load business settings for receipt
+  const [businessLogo, setBusinessLogo] = useState<string | null>(null);
+  const [businessInfo, setBusinessInfo] = useState({ name: "LEXINTEL POS", address: "Main Branch" });
+
+  useEffect(() => {
+    // Load settings from localStorage
+    const saved = localStorage.getItem("lexintel-settings");
+    if (saved) {
+      try {
+        const settings = JSON.parse(saved);
+        if (settings.businessLogo) setBusinessLogo(settings.businessLogo);
+        if (settings.businessInfo) setBusinessInfo({
+          name: settings.businessInfo.name || "LEXINTEL POS",
+          address: settings.businessInfo.address || "Main Branch"
+        });
+      } catch {}
+    }
+  }, []);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [cartItems, setCartItems] = useState<SaleItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -106,8 +124,102 @@ export default function POSPage() {
   };
 
   const printReceipt = () => {
-    // Open print dialog
-    window.print();
+    // Create a clean print window for the receipt
+    const receiptContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt - ${completedSale?.id}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 10px; }
+          .receipt { max-width: 280px; margin: 0 auto; }
+          .header { text-align: center; margin-bottom: 15px; }
+          .header h1 { font-size: 16px; margin-bottom: 5px; }
+          .header p { font-size: 10px; color: #666; }
+          .logo { max-width: 80px; max-height: 40px; margin-bottom: 10px; }
+          .divider { border-top: 1px dashed #000; margin: 10px 0; }
+          .item { display: flex; justify-content: space-between; margin: 5px 0; }
+          .item-name { flex: 1; }
+          .item-qty { width: 30px; text-align: center; }
+          .item-price { width: 60px; text-align: right; }
+          .total { font-weight: bold; font-size: 14px; margin-top: 10px; }
+          .change { margin-top: 5px; }
+          .footer { text-align: center; margin-top: 20px; font-size: 10px; }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div class="header">
+            ${businessLogo ? `<img src="${businessLogo}" alt="Logo" class="logo" />` : ''}
+            <h1>LEXINTEL POS</h1>
+            <p>Main Branch · Nairobi</p>
+            <p>${new Date().toLocaleString('en-KE')}</p>
+          </div>
+          <div class="divider"></div>
+          ${cartItems.map(item => `
+            <div class="item">
+              <span class="item-name">${item.productName} x${item.quantity}</span>
+              <span class="item-price">KES ${item.totalPrice.toFixed(2)}</span>
+            </div>
+          `).join('')}
+          <div class="divider"></div>
+          <div class="item">
+            <span>VAT (16%)</span>
+            <span>KES ${totalVat.toFixed(2)}</span>
+          </div>
+          ${discountAmount > 0 ? `
+          <div class="item" style="color: green;">
+            <span>Discount</span>
+            <span>-KES ${discountAmount.toFixed(2)}</span>
+          </div>
+          ` : ''}
+          <div class="total">
+            <div class="item">
+              <span>TOTAL</span>
+              <span>KES ${total.toFixed(2)}</span>
+            </div>
+          </div>
+          <div class="item">
+            <span>Payment</span>
+            <span>${paymentMethod}</span>
+          </div>
+          ${paymentMethod === "Cash" && change >= 0 ? `
+          <div class="change">
+            <div class="item">
+              <span>Cash Received</span>
+              <span>KES ${Number(cashReceived).toFixed(2)}</span>
+            </div>
+            <div class="item">
+              <span>CHANGE</span>
+              <span>KES ${change.toFixed(2)}</span>
+            </div>
+          </div>
+          ` : ''}
+          <div class="divider"></div>
+          <div class="footer">
+            <p>Ref: ${completedSale?.id}</p>
+            <p>Thank you for shopping with us!</p>
+            <p>www.forbesa.co.ke</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Open a new window with the receipt content
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (printWindow) {
+      printWindow.document.write(receiptContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.close();
+      };
+    }
   };
 
   // Barcode Scanner Function

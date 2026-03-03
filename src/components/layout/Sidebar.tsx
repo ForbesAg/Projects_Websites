@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Zap,
   GraduationCap,
+  UserCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/inventory", label: "Inventory", icon: Package, roles: ["Admin", "Manager"] },
   { href: "/accounting", label: "Accounting", icon: BookOpen, roles: ["Admin", "Manager", "Accountant"] },
   { href: "/reports", label: "Reports", icon: BarChart3, roles: ["Admin", "Manager", "Accountant"] },
+  { href: "/customers", label: "Customers", icon: UserCircle, roles: ["Admin", "Manager", "Cashier"] },
   { href: "/suppliers", label: "Suppliers", icon: Truck, roles: ["Admin", "Manager"] },
   { href: "/users", label: "Users & Roles", icon: Users, roles: ["Admin"] },
   { href: "/training", label: "Training", icon: GraduationCap, roles: ["Admin", "Manager", "Cashier", "Accountant"] },

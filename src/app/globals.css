@@ -43,7 +43,7 @@ body {
 /* Print styles */
 @media print {
   body {
-    background: white;
+    background: white !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -52,6 +52,62 @@ body {
   }
   .print-only {
     display: block !important;
+  }
+  /* Hide sidebar and topbar during print */
+  nav, .sidebar, header, .topbar, .TopBar {
+    display: none !important;
+  }
+  /* Hide all page content except print container */
+  main, .main-content, > div:not(.print-receipt-container) {
+    display: none !important;
+  }
+  /* Receipt print container - full page */
+  .print-receipt-container {
+    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    background: white !important;
+    padding: 20px;
+    margin: 0;
+    z-index: 9999;
+  }
+  /* Receipt specific styles */
+  .receipt-content {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    max-width: 80mm;
+    margin: 0 auto;
+  }
+  .receipt-content .header {
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .receipt-content .logo {
+    max-width: 100px;
+    max-height: 50px;
+    margin-bottom: 10px;
+  }
+  .receipt-content .divider {
+    border-top: 1px dashed #000;
+    margin: 10px 0;
+  }
+  .receipt-content .item-row {
+    display: flex;
+    justify-content: space-between;
+  }
+  .receipt-content .total {
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: 10px;
+  }
+  .receipt-content .footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 10px;
   }
   main {
     margin-left: 0 !important;
